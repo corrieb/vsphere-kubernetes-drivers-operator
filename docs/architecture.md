@@ -54,8 +54,7 @@ Some of these issues can be fixed relatively easily by updating the documentatio
 and decoupling CSI from CPI. However, our users and partners expect more than this and have requested that
 we create a Kubernetes Operator that automatically handles the majority of tasks that currently must be done manually.
 
-The primary objective of this architecture is to create [an Operator](https://github.com/vmware-tanzu/vsphere-kubernetes-drivers-operator)
-that satisfies the requirements from RedHat who are co-funding this effort under the Joint Innovation Lab initiative.
+The primary objective of this architecture is to create an Operator that satisfies the requirements for OpenShift
 
 ## Goals
 
