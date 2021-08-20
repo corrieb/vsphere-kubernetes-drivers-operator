@@ -93,4 +93,46 @@ although support for vanilla Kubernetes should mean that it will just work
 - No support for ensuring that Kubernetes CPI and vSphere Region / Zone configuration matches up
 - No support for UI integration with vSphere, although it should be noted that this may be desirable in the medium term
 
+## Proposed Architecture
+
+Here is a high-level diagram of the architecture showing the net new components with a shadow
+
+![](arch-diagram-1.png "Proposed Architecture")
+
+### VDO Command-line tool
+
+The VDO command-line tool is designed with a few goals in mind:
+
+1. Simplify the deployment of VDO, so that the typical user does not need to have any knowledge about CRD schema,
+service accounts, roles, deployments or any boilerplate YAML
+    1. Note that power users can choose to apply CRDs and YAML directly via kubectl if they desire
+2. Create and manage user accounts in vSphere that VDO will use for the CSI and CPI drivers
+    1. User accounts should be created with least privilege
+    2. vSphere Admin credentials for the user management would be used for just that specific operation and would not be persisted anywhere
+    3. The necessary Secrets for the user account(s) created would then be automatically created in the target Kubernetes cluster
+3. Summarize the VDOConfig and vSphereConnection CRD statuses so that the user can get a quick and easy summary. Eg:
+    1. Shows the versions of drivers currently installed
+    2. Shows the health of the drivers
+    3. Shows the vSphere user(s) currently in use and the connection status
+4. Provide the option to upgrade the drivers, if an upgraded version is available. There are two mechanisms by which this can be achieved
+    1. By downloading an updated version of the command-line tool, which should contain the latest configuration
+matrix and configuration templates. The tool can then apply an update to the VDO config. VDO then takes responsibility
+for updating the drivers. This is the *Static* method (see below)
+    3. By updating an online version of the compatibility matrix that VDO is watching. VDO should then automatically
+update the drivers. This is the *Dynamic* method (see below)
+5. Provide the option to upgrade the VDO driver
+    1. Since the VDO command-line tool and VDO deployment are intentionally tightly-coupled, you update one by updating the other.
+
+We would expect the VDO command-line tool to be tightly-coupled to the VDO operator and as such will be a part of the same project,
+using the same version numbers. As such, the command-line tool will upgrade/downgrade the VDO operator by virtue of the
+Deployment/Pod/Container config that it generates. Thus if a user wants to upgrade their VDO, they only need to update the command-line tool.
+
+The VDO command-line tool authenticates with a Kubernetes cluster using a kubeconfig file, just like kubectl.
+
+The VDO command-line tool should block when it is deploying VDO and it should report simple status summary back to the
+command-line. It should not return until the drivers have installed successfully. While this is not the expected UX for
+power-uses with kubectl who expect asynchronous operation, it is a more natural UX for average users who would expect scripts
+to block until they've completed. The command-line tool should respond to signals in the way the user would expect and if
+the user does choose to kill the command-line tool during install (for example if the install is not succeeding), the
+operation will continue asynchronously in the background and they can use the command-line tool to report on the status.
 
