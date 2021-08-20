@@ -287,4 +287,116 @@ The most sensible default should be the one that causes the least surprises.
 The rolling back of an auto-update that has not successfully deployed is not MVP, but should be considered
 in a future version. In such a case, if a rollback is triggered, the error must be reported as a Condition in VDO.
 
+### Error Checking and Validation
 
+A critical element to a good User Experience with Kubernetes is clear and actionable error reporting and validation checking.
+VDO will use the following methods to ensure a good UX:
+
+#### Logging
+
+VDO should log clear details about what its control loops are doing. VDO should avoid being too verbose,
+but provide a clear audit trail of key function such as:
+
+- Operator initialization - have all the control loops initialized successfully? What configuration options is it defaulting to?
+- Polling for the compatibility matrix - was it successful? Was there anything actionable?
+- Creating the YAML for deployment - did it make the substitutions successfully?
+- Kubernetes control plane operations - was it successful? What was the updated object ID?
+- Validation checking of vSphereConnection - was it successful?
+- Validation checks of driver install / upgrade - what checks were done and what was the result?
+
+#### Validation Checks
+
+VDO should have a clear set of preconditions that need to be met before it will install either CPI or CSI. 
+Whether or not those preconditions have been met should be clearly visible to a power user with kubectl.
+
+#### Conditions
+
+VDO could use the concept of Conditions to describe the state of the drivers it's managing. See Node
+[Conditions](https://kubernetes.io/docs/concepts/architecture/nodes/#condition) as examples.
+The most obvious use case for conditions is displaying the Validation Checks that should be performed on the cluster and drivers.
+Eg. Is CNI installed in the cluster? If CPI is installed, do the nodes have ProviderIDs?
+
+#### Events
+
+Any regular operation that VDO does can be published as an Event. This is very useful in both the success
+and error cases in showing just how many times the operation succeeded or failed and some contextual information.
+
+#### Phases
+
+We should avoid the explicit use of Phases such as "running, upgrading, installing" etc. These can end up being
+confusing to users and ultimately should be unnecessary if the Status, Events and Conditions are clearly presented.
+
+#### Cmd-line tool
+
+The command-line tool should be able to summarize the status of VDO and the drivers its managing in a fashion
+that is simple to understand. As an example, if everything is running and installed successfully,
+it should simply show the versions of the installed drivers and a single word status, such as "Healthy".
+The purpose of this is simply to make it easy for the average user to validate the install.
+
+## Abstract Example Deployment
+
+### Quick demo
+
+Assumes that the user has gone to the GitHub repo and downloaded the latest VDO for their client OS
+
+```
+> export VDO_KUBECONFIG=/tmp/kube.conf
+ 
+> vdo help
+Available Commands:
+   version: Shows the version of VDO and the CPI/CSI driver versions supported
+   status:  Shows the status of the VDO in the target cluster
+   users:   Manage vCenter service accounts to be used for CSI and CPI
+   secrets: Manage vCenter credentials for CSI and CPI
+   deploy:  Deploys VDO to the target cluster
+   help:    Show this help
+ 
+> vdo version
+VDO Version Data:
+  VDO: v0.1.5
+  CPI: v1.1.0 - v1.21.0
+  CSI: v1.0.3 - v2.2.1
+ 
+> vdo status
+VDO Status:
+  VDO: Not Deployed
+  CPI: Not Deployed
+  CSI: Not Deployed
+ 
+Tip: To deploy VDO, use "vdo deploy"
+ 
+> vdo deploy help
+Available parameters:
+   --cpi-container-image-url=<URL>      The image repository URL of the CPI container image (do not specify version)
+   --csi-container-image-url=<URL>      The image repository URL of the CSI container image (do not specify version)
+   --compatibility-matrix-url=<URL>     Network location of a dynamic compatibility matrix (optional)
+ 
+Tip: For a quick deployment, you will be prompted for vCenter secrets
+ 
+> vdo deploy \
+  --cpi-container-image-url=https://registry.com/cpi-image \
+  --csi-container-image-url=https://registry.com/csi-image \
+Please enter the vCenter URL you want to connect to:
+> 192.168.32.16
+Please enter the vCenter user ID you wish CPI and CSI to use:
+> administrator@vsphere.local
+Please enter the vCenter password you wish CPI and CSI to use:
+> sdfiuhwevg234
+ 
+...Deploying vCenter secret
+...Configuring VDO
+...Deploying VDO
+ 
+ 
+Tip: Please run "vdo status" to check deployment status
+ 
+> vdo status
+VDO Status:
+  vCenter Version: v7.1.0
+  VDO: Running
+     Version: v0.1.5
+  CPI: Running
+     Version: v1.21.0
+  CSI: Running
+     Version: v2.2.1
+```
