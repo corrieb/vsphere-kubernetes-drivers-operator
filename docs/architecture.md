@@ -217,3 +217,74 @@ summary in the VDOConfig Status.
 
 It should be noted that a valid configuration is that CPI and CSI use different vSphere user credentials and therefore
 would use different vSphereConnection and Secret instances.
+
+### Compatibility Matrix, Configuration and Container Images
+
+<img src="arch-diagram-2.png" alt="Compatibility Matrix" width="373"/>
+
+One of the most important functions of VDO is its ability to automate the selection of driver versions that are appropriate
+to the version of Kubernetes and vSphere in use. Version information needs to be selected both for initial install and
+dynamically during the lifecycle of the cluster when upgrades will be performed automatically if necessary.
+
+As such, there is a need for VDO to be able to access specific assets in order for it to generate its configuration. These include:
+- The Compatibility Matrix, which is a human-readable document in a structured format such as JSON
+- Configuration template(s) specific to the version(s) of CSI and CPI being used.
+- The container image binaries for the CSI and CPI drivers
+
+Note that the design of the format of these assets is beyond the scope of this architecture and should be provided
+in a separate design document. 
+
+The design must balance the need to be able to get demo environments up quickly and easily,
+while also ensuring that we have secure online and offline transport mechanisms for these assets.
+Currently, users have to manually copy the configuration from the public GitHub,
+find a place to persist it and then work out how to customize it.
+Additionally, they have to have a container image registry that is reachable by the K8S cluster which needs to be
+configured with the correct credentials. There is then no option to auto-update.
+
+#### VDO Auto-update Mechanism
+
+With VDO, we envisage 2 approaches to delivering these assets:
+
+**Dynamic**: A network URL is provided to the compatibility matrix, which itself has network URLs to the configuration
+templates for each version. VDO pulls the data from the URL, which could be public or private. VDO will poll for updates
+and depending on the version update policy, will auto-update the drivers. The auto-update behavior requires that the URL
+of the container images is already correct in the configuration templates.
+
+**Static**: The VDO command-line tool pushes the compatibility and configuration state as a bundle to the cluster where
+it is persisted Eg. using an EmptyDir or ConfigMap Volume. VDO will then pull from file-based URLs that correspond to the
+VDO volume mount chosen. The contents of the volume can be updated by a new version of the VDO command-line tool.
+The VDO command-line tool should make it easy to override the URL of the container images.
+
+The advantage of Dynamic mode is that it allows for simple Quickstart Demos where access to public internet can be assumed.
+Users wanting this dynamic behavior, but better security or control over the compatibility matrix and its configuration
+state can choose to copy and host it in a private intranet where it can be updated in a more controlled fashion.
+
+Users wanting the ultimate in security, stability and control can use Static mode. In order to facilitate this, the VDO
+command-line tool will be built with all of the compatibility and configuration state necessary to support all of the
+versions of CSI and CPI it is capable of deploying. In this mode, updates to new versions of CSI and CPI will necessarily
+first require an update to the command-line tool.
+
+The Compatibility Matrix must be capable of storing contextual data about a particular version of a driver. A specific
+example of this is whether CSI needs a CPI in order to run. If only CSI is requested (without CPI) then only a subset of
+the compatible version range can be used. This could also be necessary in the case where a particular driver version has
+to be marked as bad (eg CVE) and shouldn't be deployed.
+
+VDO itself should support as wide a range of Kubernetes and vSphere as possible. Users should simply be able to select
+the latest VDO without having to consider compatibility issues.
+
+More details on version management can be found [here](https://confluence.eng.vmware.com/pages/viewpage.action?pageId=832096702).
+
+#### VDO Auto-update Behavior
+
+When it comes to auto-updates, there will be two kinds of user: Those who want new updates installed eagerly to ensure
+that their cluster is always the most up-to-date and those who will want to prioritize stability and will only want
+updates done if there is an issue of incompatibility. 
+These policies can be expressed in a simple configuration option to VDO - something like
+
+--update_policy=[latest,lts,disabled]
+The most sensible default should be the one that causes the least surprises. 
+
+The rolling back of an auto-update that has not successfully deployed is not MVP, but should be considered
+in a future version. In such a case, if a rollback is triggered, the error must be reported as a Condition in VDO.
+
+
